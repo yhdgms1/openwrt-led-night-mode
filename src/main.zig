@@ -9,10 +9,6 @@ const split = std.mem.split;
 const parseInt = std.fmt.parseInt;
 const Chameleon = @import("chameleon");
 
-fn get_crontab_file_location() []u8 {
-    return "/var/spool/cron/crontabs/root";
-}
-
 fn get_leds() ![][]const u8 {
     var dir = try fs.openDirAbsolute("/sys/class/leds/", .{ .iterate = true });
     defer dir.close();
@@ -54,8 +50,6 @@ fn print_leds() !void {
         try c.green().printOut("{s}\n", .{led});
     }
 }
-
-fn uninstall() !void {}
 
 fn get_args() ![][]u8 {
     var gpa = GeneralPurposeAllocator(.{}){};
@@ -130,6 +124,61 @@ fn build_commands(start_hour: u8, start_minute: u8, end_hour: u8, end_minute: u8
     return list.toOwnedSlice();
 }
 
+fn strip_installation() !void {}
+
+fn uninstall() !void {}
+
+fn install(args: [][]u8) !void {
+    try print_header("install");
+
+    var start_hour: u8 = 22;
+    var start_minute: u8 = 0;
+    var end_hour: u8 = 7;
+    var end_minute: u8 = 0;
+
+    var i: u4 = 2;
+
+    while (i < args.len) : (i += 1) {
+        const parameter = args[i];
+
+        var parsed = split(u8, parameter, "=");
+
+        const name = parsed.first()[2..];
+        const value = parsed.next().?;
+
+        var time = split(u8, value, ":");
+
+        const hours_string = time.first();
+        const minutes_string = time.next().?;
+
+        const hours = try parseInt(u8, hours_string, 10);
+        const minutes = try parseInt(u8, minutes_string, 10);
+
+        if (equal(u8, name, "start")) {
+            start_hour = hours;
+            start_minute = minutes;
+        } else if (equal(u8, name, "end")) {
+            end_hour = hours;
+            end_minute = minutes;
+        }
+    }
+
+    const commands = try build_commands(start_hour, start_minute, end_hour, end_minute);
+
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+
+    defer _ = gpa.deinit();
+
+    const content = try fs.cwd().readFileAlloc(allocator, "/var/spool/cron/crontabs/root", 1024);
+
+    // todo: find and strip previous installation
+    // todo: write to file new content
+
+    std.debug.print("{s}", .{content});
+    std.debug.print("{s}", .{commands});
+}
+
 pub fn main() !void {
     const args = try get_args();
     const command = args[1];
@@ -139,40 +188,6 @@ pub fn main() !void {
     } else if (equal(u8, command, "list")) {
         try print_leds();
     } else if (equal(u8, command, "install")) {
-        var start_hour: u8 = 22;
-        var start_minute: u8 = 0;
-        var end_hour: u8 = 7;
-        var end_minute: u8 = 0;
-
-        var i: u4 = 2;
-
-        while (i < args.len) : (i += 1) {
-            const parameter = args[i];
-
-            var parsed = split(u8, parameter, "=");
-
-            const name = parsed.first()[2..];
-            const value = parsed.next().?;
-
-            var time = split(u8, value, ":");
-
-            const hours_string = time.first();
-            const minutes_string = time.next().?;
-
-            const hours = try parseInt(u8, hours_string, 10);
-            const minutes = try parseInt(u8, minutes_string, 10);
-
-            if (equal(u8, name, "start")) {
-                start_hour = hours;
-                start_minute = minutes;
-            } else if (equal(u8, name, "end")) {
-                end_hour = hours;
-                end_minute = minutes;
-            }
-        }
-
-        const commands = try build_commands(start_hour, start_minute, end_hour, end_minute);
-
-        std.debug.print("{s}", .{commands});
+        try install(args);
     } else if (equal(u8, command, "uninstall")) {}
 }

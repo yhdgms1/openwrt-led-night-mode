@@ -16,7 +16,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const lib = b.addStaticLibrary(.{
-        .name = "openwrt-led-control",
+        .name = "openwrt-led-night-mode",
         // In this case the main source file is merely a path, however, in more
         // complicated build scripts, this could be a generated file.
         .root_source_file = b.path("src/root.zig"),
@@ -30,11 +30,14 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(lib);
 
     const exe = b.addExecutable(.{
-        .name = "openwrt-led-control",
+        .name = "openwrt-led-night-mode",
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
+
+    const cham = b.dependency("chameleon", .{});
+    exe.root_module.addImport("chameleon", cham.module("chameleon"));
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default

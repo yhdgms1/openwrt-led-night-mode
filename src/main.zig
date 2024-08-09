@@ -46,6 +46,8 @@ fn print_leds() !void {
     defer c.deinit();
     defer _ = gpa.deinit();
 
+    try print_header("list");
+
     const leds = try get_leds();
 
     for (leds) |led| {
@@ -66,6 +68,18 @@ fn get_args() ![][]u8 {
     return args;
 }
 
+fn print_header(command: []const u8) !void {
+    var gpa = GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+
+    var c = Chameleon.initRuntime(.{ .allocator = allocator });
+
+    defer c.deinit();
+    defer _ = gpa.deinit();
+
+    std.debug.print("{s} {s}\n\n", .{ try c.black().bgGreen().fmt(" openwrt led night mode ", .{}), command });
+}
+
 fn print_help() !void {
     var gpa = GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
@@ -75,9 +89,9 @@ fn print_help() !void {
     defer c.deinit();
     defer _ = gpa.deinit();
 
+    try print_header("help");
+
     const text =
-        \\{s} help
-        \\
         \\{s}      — print this message
         \\{s}      — print all LED's
         \\{s}   — install, configure via --start=22:00 and --end=07:00 flags
@@ -86,7 +100,6 @@ fn print_help() !void {
     ;
 
     std.debug.print(text, .{
-        try c.black().bgGreen().fmt(" openwrt led night mode ", .{}),
         try c.magentaBright().fmt("help", .{}),
         try c.magentaBright().fmt("list", .{}),
         try c.magentaBright().fmt("install", .{}),

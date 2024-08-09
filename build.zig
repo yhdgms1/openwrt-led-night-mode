@@ -36,6 +36,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    // Highlighting library
     const cham = b.dependency("chameleon", .{});
     exe.root_module.addImport("chameleon", cham.module("chameleon"));
 

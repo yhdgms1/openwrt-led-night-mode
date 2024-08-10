@@ -124,9 +124,61 @@ fn build_commands(start_hour: u8, start_minute: u8, end_hour: u8, end_minute: u8
     return list.toOwnedSlice();
 }
 
-fn strip_installation() !void {}
+fn includes(buffer: []const u8, search: []const u8) bool {
+    if (buffer.len < search.len) {
+        return false;
+    }
 
-fn uninstall() !void {}
+    if (search.len == 0) {
+        return false;
+    }
+
+    for (buffer, 0..) |_, i| {
+        const start = i;
+        const end = i + search.len;
+
+        if (end > buffer.len) {
+            break;
+        }
+
+        const str = buffer[start..end];
+
+        if (equal(u8, str, search)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+fn strip_installation(content: []u8) ![][]const u8 {
+    var lines = split(u8, content, "\n");
+    var ignore = false;
+
+    var gpa = GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+
+    errdefer _ = gpa.deinit();
+
+    var list = ArrayList([]const u8).init(allocator);
+    errdefer list.deinit();
+
+    while (lines.next()) |line| {
+        if (includes(line, "#openwrt-led-night-mode-start\n")) {
+            ignore = true;
+        } else if (includes(line, "#openwrt-led-night-mode-end\n")) {
+            ignore = false;
+        } else if (!ignore) {
+            try list.append(line);
+        }
+    }
+
+    return list.toOwnedSlice();
+}
+
+fn uninstall() !void {
+    try print_header("uninstall");
+}
 
 fn install(args: [][]u8) !void {
     try print_header("install");
@@ -165,18 +217,37 @@ fn install(args: [][]u8) !void {
 
     const commands = try build_commands(start_hour, start_minute, end_hour, end_minute);
 
+    // что за бред? если нет файла дайте его создать, иначе верните ошибку. хрен ли нельзя так сделать?
+    fs.accessAbsolute("/var/spool/cron/crontabs/root", .{}) catch |e| {
+        return switch (e) {
+            error.FileNotFound => {
+                _ = try fs.createFileAbsolute("/var/spool/cron/crontabs/root", .{});
+            },
+            else => {
+                return e;
+            },
+        };
+    };
+
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
 
     defer _ = gpa.deinit();
 
     const content = try fs.cwd().readFileAlloc(allocator, "/var/spool/cron/crontabs/root", 1024);
+    const stripped = try strip_installation(content);
 
-    // todo: find and strip previous installation
-    // todo: write to file new content
+    // и как переписать файл? удалить его и заного создать? да хрен бы там плавал
 
-    std.debug.print("{s}", .{content});
-    std.debug.print("{s}", .{commands});
+    const file = try fs.openFileAbsolute("/var/spool/cron/crontabs/root", .{ .mode = .write_only });
+
+    defer file.close();
+
+    for (stripped) |line| {
+        _ = try file.write(line);
+    }
+
+    _ = try file.write(commands);
 }
 
 pub fn main() !void {

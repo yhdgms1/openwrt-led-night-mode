@@ -97,6 +97,8 @@ pub fn install(args: [][]u8) !void {
     var cronFile = try utils.get_cron_file_stripped(allocator);
 
     _ = try cronFile.file.write(commands);
+
+    defer cronFile.deinit();
 }
 
 pub fn uninstall() !void {

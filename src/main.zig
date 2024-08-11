@@ -8,6 +8,7 @@ const equal = std.mem.eql;
 const split = std.mem.split;
 const parseInt = std.fmt.parseInt;
 const Chameleon = @import("chameleon");
+const SuperFile = @import("./super_file.zig").SuperFile;
 
 fn get_leds() ![][]const u8 {
     var dir = try fs.openDirAbsolute("/sys/class/leds/", .{ .iterate = true });
@@ -217,37 +218,21 @@ fn install(args: [][]u8) !void {
 
     const commands = try build_commands(start_hour, start_minute, end_hour, end_minute);
 
-    // что за бред? если нет файла дайте его создать, иначе верните ошибку. хрен ли нельзя так сделать?
-    fs.accessAbsolute("/var/spool/cron/crontabs/root", .{}) catch |e| {
-        return switch (e) {
-            error.FileNotFound => {
-                _ = try fs.createFileAbsolute("/var/spool/cron/crontabs/root", .{});
-            },
-            else => {
-                return e;
-            },
-        };
-    };
+    var superFile = try SuperFile.init("/var/spool/cron/crontabs/root");
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
 
-    defer _ = gpa.deinit();
-
-    const content = try fs.cwd().readFileAlloc(allocator, "/var/spool/cron/crontabs/root", 1024);
+    const content = try superFile.read(allocator);
     const stripped = try strip_installation(content);
 
-    // и как переписать файл? удалить его и заного создать? да хрен бы там плавал
-
-    const file = try fs.openFileAbsolute("/var/spool/cron/crontabs/root", .{ .mode = .write_only });
-
-    defer file.close();
+    try superFile.clear();
 
     for (stripped) |line| {
-        _ = try file.write(line);
+        _ = try superFile.file.write(line);
     }
 
-    _ = try file.write(commands);
+    _ = try superFile.file.write(commands);
 }
 
 pub fn main() !void {
@@ -260,5 +245,7 @@ pub fn main() !void {
         try print_leds();
     } else if (equal(u8, command, "install")) {
         try install(args);
-    } else if (equal(u8, command, "uninstall")) {}
+    } else if (equal(u8, command, "uninstall")) {
+        try uninstall();
+    }
 }

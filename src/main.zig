@@ -1,6 +1,4 @@
 const std = @import("std");
-const heap = std.heap;
-const GeneralPurposeAllocator = heap.GeneralPurposeAllocator;
 const equal = std.mem.eql;
 const utils = @import("./utils.zig");
 const commands = @import("./commands.zig");

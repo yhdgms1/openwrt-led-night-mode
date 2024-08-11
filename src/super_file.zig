@@ -6,7 +6,7 @@ pub const SuperFile = struct {
     file: fs.File,
 
     pub fn init(path: []const u8) !SuperFile {
-        const file = fs.cwd().openFile(path, .{ .mode = .read_write }) catch try fs.cwd().createFile(path, .{});
+        const file = fs.cwd().openFile(path, .{ .mode = .read_write }) catch try fs.cwd().createFile(path, .{ .read = true });
 
         return SuperFile{
             .file = file,

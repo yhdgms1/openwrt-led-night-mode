@@ -165,9 +165,9 @@ fn strip_installation(content: []u8) ![][]const u8 {
     errdefer list.deinit();
 
     while (lines.next()) |line| {
-        if (includes(line, "#openwrt-led-night-mode-start\n")) {
+        if (includes(line, "#openwrt-led-night-mode-start")) {
             ignore = true;
-        } else if (includes(line, "#openwrt-led-night-mode-end\n")) {
+        } else if (includes(line, "#openwrt-led-night-mode-end")) {
             ignore = false;
         } else if (!ignore) {
             try list.append(line);
@@ -175,10 +175,6 @@ fn strip_installation(content: []u8) ![][]const u8 {
     }
 
     return list.toOwnedSlice();
-}
-
-fn uninstall() !void {
-    try print_header("uninstall");
 }
 
 fn install(args: [][]u8) !void {
@@ -228,11 +224,34 @@ fn install(args: [][]u8) !void {
 
     try superFile.clear();
 
+    // todo: fix extra new lines
     for (stripped) |line| {
         _ = try superFile.file.write(line);
+        _ = try superFile.file.write("\n");
     }
 
     _ = try superFile.file.write(commands);
+}
+
+// todo: do not duplicate code
+fn uninstall() !void {
+    try print_header("uninstall");
+
+    var superFile = try SuperFile.init("/var/spool/cron/crontabs/root");
+
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+
+    const content = try superFile.read(allocator);
+    const stripped = try strip_installation(content);
+
+    try superFile.clear();
+
+    // todo: fix extra new lines
+    for (stripped) |line| {
+        _ = try superFile.file.write(line);
+        _ = try superFile.file.write("\n");
+    }
 }
 
 pub fn main() !void {

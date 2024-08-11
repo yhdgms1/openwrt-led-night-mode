@@ -22,6 +22,14 @@ pub const SuperFile = struct {
         return self.file.readToEndAlloc(alloc, 8 * 1024);
     }
 
+    pub fn write(self: *SuperFile, bytes: []const u8) !void {
+        _ = try self.file.write(bytes);
+    }
+
+    pub fn new_line(self: *SuperFile) !void {
+        try self.write("\n");
+    }
+
     pub fn clear(self: *SuperFile) !void {
         self.file.close();
         self.file = try fs.cwd().createFile(self.path, .{});

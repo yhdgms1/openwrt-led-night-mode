@@ -5,7 +5,7 @@ It allows users to automatically adjust the brightness of their router's LEDs du
 
 ## How it works
 
-The program interacts with the router's cron system to schedule brightness adjustments for LEDs. By setting start and end times, you can dim or turn off the LEDs during the night and restore them to normal brightness during the day.
+The program interacts with the router's cron system to schedule brightness adjustments for LEDs. By setting start and end times, you can turn off the LEDs during the night and restore them to normal brightness during the day.
 
 ## Usage
 

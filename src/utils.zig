@@ -2,7 +2,8 @@ const std = @import("std");
 const fs = std.fs;
 const mem = std.mem;
 const equal = mem.eql;
-const split = mem.split;
+const splitSequence = mem.splitSequence;
+const parseInt = std.fmt.parseInt;
 const heap = std.heap;
 const process = std.process;
 const print = std.debug.print;
@@ -36,8 +37,18 @@ pub fn includes(buffer: []const u8, search: []const u8) bool {
     return false;
 }
 
+pub fn contains(array: [][]const u8, search: []const u8) bool {
+    for (array) |item| {
+        if (equal(u8, item, search)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 pub fn strip_installation(content: []u8) ![][]const u8 {
-    var lines = split(u8, content, "\n");
+    var lines = splitSequence(u8, content, "\n");
     var ignore = false;
 
     var gpa = heap.GeneralPurposeAllocator(.{}){};
@@ -110,9 +121,9 @@ pub fn get_leds() ![][]const u8 {
     return try list.toOwnedSlice();
 }
 
-pub fn build_commands(start_hour: u8, start_minute: u8, end_hour: u8, end_minute: u8) ![]u8 {
-    const leds = try get_leds();
+pub const BuildCommandsOptions = struct { leds: [][]const u8, start_hour: u8, start_minute: u8, end_hour: u8, end_minute: u8 };
 
+pub fn build_commands(options: BuildCommandsOptions) ![]u8 {
     var gpa = heap.GeneralPurposeAllocator(.{}){};
     errdefer _ = gpa.deinit();
 
@@ -123,14 +134,77 @@ pub fn build_commands(start_hour: u8, start_minute: u8, end_hour: u8, end_minute
 
     try list.writer().print("#openwrt-led-night-mode-start\n", .{});
 
-    for (leds) |led| {
-        try list.writer().print("{d} {d} * * * echo 0 > /sys/class/leds/{s}/brightness\n", .{ start_minute, start_hour, led });
-        try list.writer().print("{d} {d} * * * echo 1 > /sys/class/leds/{s}/brightness\n", .{ end_minute, end_hour, led });
+    for (options.leds) |led| {
+        try list.writer().print("{d} {d} * * * echo 0 > /sys/class/leds/{s}/brightness\n", .{ options.start_minute, options.start_hour, led });
+        try list.writer().print("{d} {d} * * * echo 1 > /sys/class/leds/{s}/brightness\n", .{ options.end_minute, options.end_hour, led });
     }
 
     try list.writer().print("#openwrt-led-night-mode-end\n", .{});
 
     return list.toOwnedSlice();
+}
+
+pub fn parse_args(args: [][]u8) !BuildCommandsOptions {
+    var gpa = heap.GeneralPurposeAllocator(.{}){};
+    errdefer _ = gpa.deinit();
+
+    const allocator = gpa.allocator();
+
+    var start_hour: u8 = 22;
+    var start_minute: u8 = 0;
+    var end_hour: u8 = 7;
+    var end_minute: u8 = 0;
+
+    var i: u4 = 2;
+
+    const system_leds = try get_leds();
+
+    var custom_leds = std.ArrayList([]const u8).init(allocator);
+    errdefer custom_leds.deinit();
+
+    var used_custom_leds = false;
+
+    while (i < args.len) : (i += 1) {
+        const parameter = args[i];
+
+        var parsed = splitSequence(u8, parameter, "=");
+
+        const name = parsed.first()[2..];
+        const value = parsed.next().?;
+
+        // Time
+        if (equal(u8, name, "start") or equal(u8, name, "end")) {
+            var time = splitSequence(u8, value, ":");
+
+            const hours_string = time.first();
+            const minutes_string = time.next().?;
+
+            const hours = try parseInt(u8, hours_string, 10);
+            const minutes = try parseInt(u8, minutes_string, 10);
+
+            if (equal(u8, name, "start")) {
+                start_hour = hours;
+                start_minute = minutes;
+            } else if (equal(u8, name, "end")) {
+                end_hour = hours;
+                end_minute = minutes;
+            }
+        } else if (equal(u8, name, "leds")) {
+            var it = splitSequence(u8, value, ",");
+
+            while (it.next()) |led| {
+                try custom_leds.append(led);
+
+                if (!contains(system_leds, led)) {
+                    std.debug.print("Unknown custom led: {s}\n", .{led});
+                }
+            }
+
+            used_custom_leds = true;
+        }
+    }
+
+    return BuildCommandsOptions{ .leds = if (used_custom_leds) try custom_leds.toOwnedSlice() else system_leds, .start_hour = start_hour, .start_minute = start_minute, .end_hour = end_hour, .end_minute = end_minute };
 }
 
 pub fn get_cron_file_stripped(allocator: mem.Allocator) !SuperFile {

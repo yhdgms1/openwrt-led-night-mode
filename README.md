@@ -9,16 +9,22 @@ The program interacts with the router's cron system to schedule brightness adjus
 
 ## Usage
 
-Run the program with `install` command. You can control night hours by providing `--start` and `--end` flags.
+You can also list all the LEDs by using `list` command.
+
+```sh
+openwrt-led-night-mode list
+```
+
+Run the program with `install` command to add changes to cron. You can control night hours by providing `--start` and `--end` flags.
 
 ```sh
 openwrt-led-night-mode install --start=22:00 --end=07:00
 ```
 
-You can also list all the leds by using `list` command.
+You can control which LEDs to include by `--leds` flag with LEDs splitted by commas
 
 ```sh
-openwrt-led-night-mode list
+openwrt-led-night-mode install --start=22:00 --end=07:00 --leds=green:status,green:wan
 ```
 
 You can run `uninstall` command for uninstalling configured cron's.

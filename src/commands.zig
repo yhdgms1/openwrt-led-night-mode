@@ -1,4 +1,5 @@
 const std = @import("std");
+const process = std.process;
 const mem = std.mem;
 const equal = mem.eql;
 const split = mem.split;
@@ -9,12 +10,12 @@ const utils = @import("./utils.zig");
 
 pub fn list() !void {
     var gpa = heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+
     const allocator = gpa.allocator();
 
     var c = Chameleon.initRuntime(.{ .allocator = allocator });
-
     defer c.deinit();
-    defer _ = gpa.deinit();
 
     try utils.print_header("list");
 
@@ -27,12 +28,12 @@ pub fn list() !void {
 
 pub fn help() !void {
     var gpa = heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+
     const allocator = gpa.allocator();
 
     var c = Chameleon.initRuntime(.{ .allocator = allocator });
-
     defer c.deinit();
-    defer _ = gpa.deinit();
 
     try utils.print_header("help");
 
@@ -90,26 +91,30 @@ pub fn install(args: [][]u8) !void {
     const commands = try utils.build_commands(start_hour, start_minute, end_hour, end_minute);
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const allocator = gpa.allocator();
-
     defer _ = gpa.deinit();
+
+    const allocator = gpa.allocator();
 
     var cronFile = try utils.get_cron_file_stripped(allocator);
 
     _ = try cronFile.file.write(commands);
 
     defer cronFile.deinit();
+
+    try utils.apply_cron_changes();
 }
 
 pub fn uninstall() !void {
     try utils.print_header("uninstall");
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const allocator = gpa.allocator();
-
     defer _ = gpa.deinit();
+
+    const allocator = gpa.allocator();
 
     var cronFile = try utils.get_cron_file_stripped(allocator);
 
     defer cronFile.deinit();
+
+    try utils.apply_cron_changes();
 }

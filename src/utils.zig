@@ -41,12 +41,12 @@ pub fn strip_installation(content: []u8) ![][]const u8 {
     var ignore = false;
 
     var gpa = heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+
     const allocator = gpa.allocator();
 
-    errdefer _ = gpa.deinit();
-
     var list = std.ArrayList([]const u8).init(allocator);
-    errdefer list.deinit();
+    defer list.deinit();
 
     while (lines.next()) |line| {
         if (includes(line, "#openwrt-led-night-mode-start")) {
@@ -63,9 +63,9 @@ pub fn strip_installation(content: []u8) ![][]const u8 {
 
 pub fn get_args() ![][]u8 {
     var gpa = heap.GeneralPurposeAllocator(.{}){};
-    const allocator = gpa.allocator();
-
     errdefer _ = gpa.deinit();
+
+    const allocator = gpa.allocator();
 
     const args = try process.argsAlloc(allocator);
 
@@ -76,12 +76,12 @@ pub fn get_args() ![][]u8 {
 
 pub fn print_header(command: []const u8) !void {
     var gpa = heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+
     const allocator = gpa.allocator();
 
     var c = Chameleon.initRuntime(.{ .allocator = allocator });
-
     defer c.deinit();
-    defer _ = gpa.deinit();
 
     print("{s} {s}\n\n", .{ try c.black().bgGreen().fmt(" openwrt led night mode ", .{}), command });
 }
@@ -91,12 +91,12 @@ pub fn get_leds() ![][]const u8 {
     defer dir.close();
 
     var gpa = heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+
     const allocator = gpa.allocator();
 
-    errdefer _ = gpa.deinit();
-
     var list = std.ArrayList([]const u8).init(allocator);
-    errdefer list.deinit();
+    defer list.deinit();
 
     var iter = dir.iterate();
 
@@ -114,9 +114,9 @@ pub fn build_commands(start_hour: u8, start_minute: u8, end_hour: u8, end_minute
     const leds = try get_leds();
 
     var gpa = heap.GeneralPurposeAllocator(.{}){};
-    const allocator = gpa.allocator();
-
     errdefer _ = gpa.deinit();
+
+    const allocator = gpa.allocator();
 
     var list = std.ArrayList(u8).init(allocator);
     errdefer list.deinit();
@@ -150,4 +150,15 @@ pub fn get_cron_file_stripped(allocator: mem.Allocator) !SuperFile {
     }
 
     return superFile;
+}
+
+pub fn apply_cron_changes() !void {
+    var gpa = heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+
+    const allocator = gpa.allocator();
+
+    var child = process.Child.init(&[_][]const u8{ "/etc/init.d/cron", "restart" }, allocator);
+
+    _ = try child.spawnAndWait();
 }
